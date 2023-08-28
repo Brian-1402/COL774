@@ -10,6 +10,8 @@ l2 = np.array(
 l3 = np.array([1, 2])
 
 
-print(l2.shape)
-print(l2)
-print(np.sort(l2, axis=0))
+# print(l2.shape)
+# print(l2)
+# print(np.sort(l2, axis=0))
+print(np.divide(l2, l1))
+print(l2 / l1)
