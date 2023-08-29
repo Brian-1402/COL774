@@ -9,3 +9,6 @@ env/
 # VS Code config files
 *.code-workspace
 .vscode
+
+# Ignored
+practice/

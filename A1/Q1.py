@@ -98,8 +98,8 @@ def execute_Q1_c():
     # -- For plotting the mesh graph of cost function --
 
     # Uses 2.7GB of RAM to display to granularity of 6e-3
-    X = np.arange(-5, 5, 6e-3)  # (x,)
-    Y = np.arange(-5, 7, 6e-3)  # (y,)
+    X = np.arange(-1, 1, 6e-3)  # (x,)
+    Y = np.arange(0, 2, 6e-3)  # (y,)
     X, Y = np.meshgrid(X, Y)  # (y,x)
     # values of X only vary across x dimension, rest are copies, similarly for Y
 
@@ -128,14 +128,14 @@ def execute_Q1_c():
     from matplotlib import cm
 
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    ax.plot_surface(X, Y, J, cmap=cm.coolwarm, antialiased=False)
+    ax.plot_surface(X, Y, J, cmap=cm.coolwarm, antialiased=False, zorder=0)
 
     # -- For plotting the gradient descent path --
     steps = linear_regression(X_norm, linearY)[2]
     t0path = np.array([i[0] for i in steps])[:, 0]
     t1path = np.array([i[0] for i in steps])[:, 1]
     zpath = np.array([i[1] for i in steps])
-    ax.plot(t0path, t1path, zpath, antialiased=False)
+    ax.plot(t0path, t1path, zpath, color="g", linewidth=2.0, zorder=10)
     plt.show()
 
 
