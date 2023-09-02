@@ -29,7 +29,7 @@ def linear_regression(
 
     """
     m = input_x.shape[0]
-    X, y = np.concatenate((input_x, np.ones((m, 1))), axis=-1), input_y
+    X, y = np.concatenate((np.ones((m, 1)), input_x), axis=-1), input_y
 
     cost_diff = float("inf")
     iter_count = 0
@@ -61,7 +61,7 @@ def predict(input_x, theta, mean=None, std=None):
         input_x = (input_x - mean) / std
 
     m = input_x.shape[0]
-    X = np.concatenate((input_x, np.ones((m, 1))), axis=-1)
+    X = np.concatenate((np.ones((m, 1)), input_x), axis=-1)
     # Axis -1 because we need to add 1s to make last dimension n to n+1.
     # For the 1s to be multiplied with theta_0, the intercept terms.
 
@@ -98,8 +98,8 @@ def execute_Q1_c():
     # -- For plotting the mesh graph of cost function --
 
     # Uses 2.7GB of RAM to display to granularity of 6e-3
-    X = np.arange(-1, 1, 6e-3)  # (x,)
-    Y = np.arange(0, 2, 6e-3)  # (y,)
+    X = np.arange(-0.25, 2.25, 6e-3)  # (y,)
+    Y = np.arange(-1.25, 1.25, 6e-3)  # (x,)
     X, Y = np.meshgrid(X, Y)  # (y,x)
     # values of X only vary across x dimension, rest are copies, similarly for Y
 
@@ -128,14 +128,22 @@ def execute_Q1_c():
     from matplotlib import cm
 
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    ax.plot_surface(X, Y, J, cmap=cm.coolwarm, antialiased=False, zorder=0)
+    ax.plot_surface(X, Y, J, cmap=cm.coolwarm, zorder=0)
 
     # -- For plotting the gradient descent path --
     steps = linear_regression(X_norm, linearY)[2]
     t0path = np.array([i[0] for i in steps])[:, 0]
     t1path = np.array([i[0] for i in steps])[:, 1]
     zpath = np.array([i[1] for i in steps])
-    ax.plot(t0path, t1path, zpath, color="g", linewidth=2.0, zorder=10)
+    ax.plot(
+        t0path[::5],
+        t1path[::5],
+        zpath[::5],
+        color="r",
+        linewidth=2.0,
+        marker=".",
+        zorder=10,
+    )
     plt.show()
 
 
@@ -157,13 +165,3 @@ def execute_Q1_c():
 
 
 execute_Q1_c()
-# -- For plotting the gradient descent path --
-# steps = linear_regression(X_norm, linearY)[2]
-# t0path = np.array([i[0] for i in steps])[:, 0]
-# t1path = np.array([i[0] for i in steps])[:, 1]
-# zpath = np.array([i[1] for i in steps])
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection="3d")
-# ax.plot(t0path, t1path, zpath, antialiased=False)
-
-# plt.show()

@@ -11,4 +11,5 @@ env/
 .vscode
 
 # Ignored
-practice/
+_references/
+_practice/
