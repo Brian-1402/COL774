@@ -111,13 +111,16 @@ X_test, y_test = (
     np.vstack((np.ones((1, q2test.shape[0])), q2test[:, 0:2].T)),
     q2test[:, 2].T,
 )
+import datetime
 
 for r, limit in [(1, 4e-2), (100, 4e-3), (10_000, 1e-5), (1_000_000, 1e-5)]:
     print(f"r: {r}, convergence criteria: {limit}")
     s.theta = np.array([[0], [0], [0]], dtype="float64")
+    t1 = datetime.datetime.now()
     s.stochastic_descent(r=r, limit=limit)
+    time_diff = datetime.datetime.now() - t1
     print(f"theta learnt: {s.theta.squeeze()}")
-    print(f"Epochs: {s.epoch_count}")
+    print(f"Epochs: {s.epoch_count}\nTime taken: {time_diff}")
     print(f"Test error: {s.J(X_test,y_test)}\n")
     s.plot_movement(r)
 

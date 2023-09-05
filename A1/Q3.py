@@ -67,7 +67,7 @@ logisticY = pd.read_csv(abs_path("data\\q3\\logisticY.csv"), header=None).to_num
 
 logistic = LogisticClassifier(logisticX, logisticY)
 logistic.train_newton()
-
+print("theta learnt:", logistic.theta.squeeze())
 # l_y = np.broadcast_to(logisticY, (logisticX.shape))
 
 points_1 = np.compress(logisticY.squeeze() == 1, logisticX, axis=-1)
