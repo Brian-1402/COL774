@@ -122,17 +122,15 @@ class NaiveBayes:
             # P(Y=yi|X=x) ~ P(X=x|Y=yi) * P(Y=yi)
         return self.y_id_inv[lpy.index(max(lpy))]
 
-    def test(self, df):
-        correct = 0
-        wrong = 0
+    def test(self, df, inf_func=None):
+        inf_func = inf_func if inf_func else self.inference
+        cm = np.zeros((self.k, self.k))
         for r in range(len(df)):
             sentence = df.loc[r, self.data_header]
-            inf = self.inference(sentence)
-            if inf == df.loc[r, self.class_header]:
-                correct += 1
-            else:
-                wrong += 1
-        return correct / (correct + wrong)
+            inf = self.y_id[inf_func(sentence)]
+            real = self.y_id[df.loc[r, self.class_header]]
+            cm[real, inf] += 1
+        return cm.trace() / cm.sum(), cm
 
 
 nb = NaiveBayes()
@@ -140,5 +138,5 @@ nb.train_params(corona_train_df)
 test_set_result = nb.test(corona_validation_df)
 train_set_result = nb.test(corona_train_df)
 
-print("Accuracy on test", test_set_result)
-print("Accuracy on train", train_set_result)
+print("Accuracy on test", test_set_result[0], "\n", test_set_result[1])
+print("Accuracy on train", train_set_result[0], "\n", train_set_result[1])
