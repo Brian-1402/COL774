@@ -74,7 +74,6 @@ class NaiveBayes:
             # For using in inference
 
     def train_params(self, df):
-        # y_id = {"Negative": 0, "Neutral": 1, "Positive": 2}
         k = self.k
         phi_x = self.phi_x
         phi_y = self.phi_y
@@ -111,16 +110,17 @@ class NaiveBayes:
 
     def inference(self, sentence):
         V = len(self.phi_x[0])
-        py = [0] * self.k
+        lpy = [0] * self.k
         # for r in range(len(series)):
         # sentence = series.loc(r, "CoronaTweet")
         for yi in range(self.k):
-            px_y = 1
+            lpx_y = 0
             for word in sentence:
                 pxi_y = self.phi_x[yi][word] if word in self.phi_x[0] else 1 / V
-                px_y *= pxi_y  # P(X=sentence|Y) = Prod[ P(X=word|Y) ]
-            py[yi] = px_y * self.phi_y[yi]  # P(Y=yi|X=x) ~ P(X=x|Y=yi) * P(Y=yi)
-        return self.y_id_inv[py.index(max(py))]
+                lpx_y += np.log10(pxi_y)  # P(X=sentence|Y) = Prod[ P(X=word|Y) ]
+            lpy[yi] = lpx_y + np.log10(self.phi_y[yi])
+            # P(Y=yi|X=x) ~ P(X=x|Y=yi) * P(Y=yi)
+        return self.y_id_inv[lpy.index(max(lpy))]
 
     def test(self, df):
         correct = 0
