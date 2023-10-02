@@ -38,3 +38,107 @@ def clean_tweet_data(df):
 
 clean_tweet_data(corona_train_df)
 clean_tweet_data(corona_validation_df)
+
+
+def generate_vocab(sentences):
+    vocab = dict()
+    for sentence in sentences:
+        for word in sentence:
+            vocab[word] = 1
+    return vocab
+
+
+# v = generate_vocab(corona_train_df["CoronaTweet"])
+
+
+class NaiveBayes:
+    def __init__(
+        self,
+        class_mapping={"Negative": 0, "Neutral": 1, "Positive": 2},
+        class_header="Sentiment",
+        data_header="CoronaTweet",
+    ):
+        self.y_id = class_mapping
+        self.k = len(self.y_id)
+        self.phi_x = []
+        for i in range(self.k):
+            self.phi_x.append(dict())
+        self.phi_y = [0] * self.k
+        self.class_header = class_header
+        self.data_header = data_header
+
+        self.y_id_inv = dict()
+        for key in self.y_id.keys():
+            value = self.y_id[key]
+            self.y_id_inv[value] = key
+            # For using in inference
+
+    def train_params(self, df):
+        # y_id = {"Negative": 0, "Neutral": 1, "Positive": 2}
+        k = self.k
+        phi_x = self.phi_x
+        phi_y = self.phi_y
+        phi_x_denom = [0] * k
+
+        # O(m) or O(words in data)
+        for r in range(len(df)):
+            y = self.y_id[df.loc[r, self.class_header]]
+            sentence = df.loc[r, self.data_header]
+            for word in sentence:
+                d = phi_x[y]
+                # If word hasn't been encountered before, intantiate it's value as 0 across all the phi_x dicts.
+                # Benefit of doing this, we won't get errors when a word exists in one dict but not in another.
+                # Another benefit is that every phi_x can be used as a global vocab.
+                # Drawback might be that slightly more memory usage.
+                if word not in d:
+                    for yi in range(k):
+                        phi_x[yi][word] = 0
+                d[word] += 1
+                phi_x_denom[y] += 1
+            phi_y[y] += 1
+
+        V = len(phi_x[0])
+        m = df.shape[0]
+
+        # O(V)
+        # dividing by denom and Laplace smoothing
+        for word in phi_x[0].keys():
+            for yi in range(k):
+                phi_x[yi][word] += 1
+                phi_x[yi][word] /= phi_x_denom[yi] + V
+        for yi in range(k):
+            phi_y[yi] /= m
+
+    def inference(self, sentence):
+        V = len(self.phi_x[0])
+        py = [0] * self.k
+        # for r in range(len(series)):
+        # sentence = series.loc(r, "CoronaTweet")
+        for yi in range(self.k):
+            px_y = 1
+            for word in sentence:
+                pxi_y = self.phi_x[yi][word] if word in self.phi_x[0] else 1 / V
+                px_y *= pxi_y  # P(X=sentence|Y) = Prod[ P(X=word|Y) ]
+            py[yi] = px_y * self.phi_y[yi]  # P(Y=yi|X=x) ~ P(X=x|Y=yi) * P(Y=yi)
+        return self.y_id_inv[py.index(max(py))]
+
+    def test(self, df):
+        correct = 0
+        wrong = 0
+        for r in range(len(df)):
+            sentence = df.loc[r, self.data_header]
+            inf = self.inference(sentence)
+            if inf == df.loc[r, self.class_header]:
+                correct += 1
+            else:
+                wrong += 1
+        return correct / (correct + wrong)
+
+
+nb = NaiveBayes()
+nb.train_params(corona_train_df)
+test_set_result = nb.test(corona_validation_df)
+train_set_result = nb.test(corona_train_df)
+
+print("Accuracy on test", test_set_result)
+print("Accuracy on train", train_set_result)
