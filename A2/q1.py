@@ -1,10 +1,8 @@
-import os
+import os, re
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from nltk.tokenize import TweetTokenizer
-
-tokenizer = TweetTokenizer()
 
 
 def abs_path(relative_pos):
@@ -98,39 +96,92 @@ class NaiveBayes:
             cm[real, inf] += 1
         return cm.trace() / cm.sum(), cm
 
-    def print_test_result(self, train_df, test_df, inf_func=None):
+    def print_test_result(self, train_df, test_df, inf_func=None, print_matrix=False):
         train_val = self.test(train_df, inf_func)
         test_val = self.test(test_df, inf_func)
-        print(
-            f"Accuracy on training data: {100*train_val[0]:.2f} %\n\n",
-            "Confusion matrix:\n",
-            train_val[1],
-            f"\nTrace: {train_val[1].trace()}\n",
-            "\n",
-        )
-        print(
-            f"Accuracy on validation data: {100*test_val[0]:.2f} %\n\n",
-            "Confusion matrix:\n",
-            test_val[1],
-            f"\nTrace: {test_val[1].trace()}\n",
-        )
+        print(f"Accuracy on training data: {100*train_val[0]:.2f} %")
+        if print_matrix:
+            print(
+                "\n\nConfusion matrix:\n",
+                train_val[1],
+                f"\nTrace: {train_val[1].trace()}\n",
+                "\n",
+            )
+        print(f"Accuracy on validation data: {100*test_val[0]:.2f} %")
+        if print_matrix:
+            print(
+                "\n\nConfusion matrix:\n",
+                test_val[1],
+                f"\nTrace: {test_val[1].trace()}\n",
+            )
 
 
 """Data Preproccessing"""
 
+
+import html, nltk, wordsegment
+import wordcloud
+
+# wordsegment.load()
+
 custom_stopwords = {"https", "t", "co"}
+nltk_stopwords = set(nltk.corpus.stopwords.words("english"))
+# nltk.download("stopwords")
+# nltk.download("wordnet")
+stopwords = nltk_stopwords.union(custom_stopwords)
 
+tw_tokenizer = nltk.tokenize.TweetTokenizer()
+re_tokenizer = nltk.tokenize.RegexpTokenizer("[\w']+")
+# re_tokenizer only outputs [a-z0-9_'], no #, @ or other symbols.
 
-def tokenize_main(s):
-    """First cleans the sentences and tokenizes"""
-    # tokenized = tokenizer.tokenize(s)
-    tokenized = s.split()
-    # print(tokenized)
-    return tokenized
+stemmer = nltk.stem.PorterStemmer()
+lemmatizer = nltk.stem.WordNetLemmatizer()
 
 
 def preprocessing_basic(s):
-    return tokenize_main(s)
+    return s.split()
+
+
+def segment_hashtags(token):
+    """Deals with hashtags and -/_ containing words by separating joint words and lemmatizing them individually.
+    segment also cleans symbols.
+
+    But takes too much time, with no improvement in accuracy.
+    """
+    ans = []
+    if re.search(r"^#|[-_]", token):
+        seg = wordsegment.segment(token)
+        for word in seg:
+            if len(token) > 1:
+                ans.append(lemmatizer.lemmatize(word))
+    return ans
+
+
+def process_tokens(s_tokens):
+    ans = []
+    for token in s_tokens:
+        if token in stopwords or token.isnumeric():
+            continue
+        if len(token) > 1:
+            ans.append(lemmatizer.lemmatize(token))
+            # ans.append(stemmer.stem(token))
+
+    return ans
+
+
+def process_sentence(s):
+    s = html.unescape(s)  # convert &amp; to &, &lt; to < etc.
+    s = s.lower()
+    # s = unicodedata.normalize("NFKD", s)
+    # # converts non ascii characters to their closest ascii char. Like ā to a.
+    s = s.encode("ascii", "ignore").decode("utf-8", "ignore")
+    # removes non-ascii characters
+    s = re.sub(r"https?\S*|t.co\S*|@\S*", "", s, count=0)
+    # remove urls and @tags
+
+    s_tokens = re_tokenizer.tokenize(s)
+    processed = process_tokens(s_tokens)
+    return processed
 
 
 def preprocess_tweets(df, preprocessing_func):
@@ -144,35 +195,54 @@ def preprocess_tweets(df, preprocessing_func):
 """Word clouds"""
 
 
-def generate_word_cloud(df, data_header="CoronaTweet"):
-    from wordcloud import WordCloud, STOPWORDS
-
-    stopwords = set(STOPWORDS).union(custom_stopwords)
-    wc = WordCloud(background_color="white", max_words=2000, stopwords=stopwords)
-    data = " ".join(df[data_header])
+def generate_word_cloud(data):
+    stopwords = set(wordcloud.STOPWORDS).union(custom_stopwords)
+    wc = wordcloud.WordCloud(
+        background_color="white",
+        max_words=2000,
+        stopwords=stopwords,
+        collocations=False,
+    )
+    data = " ".join(data)
     wc.generate(data)
     plt.imshow(wc, interpolation="bilinear")
     plt.axis("off")
     plt.show()
 
 
-# generate_word_cloud(corona_train_df)
-# generate_word_cloud(corona_validation_df)
+"""Misc"""
 
-basic_clean_train_df = preprocess_tweets(corona_train_df, preprocessing_basic)
-basic_clean_validation_df = preprocess_tweets(corona_validation_df, preprocessing_basic)
 
-# generate_word_cloud(corona_train_df)
-# generate_word_cloud(corona_validation_df)
+def df_to_list(df, data_header="CoronaTweet"):
+    data = df[data_header].explode().tolist()
+    data = [str(i) for i in data]
+    return data
+
 
 """Main execution"""
 
 
-train_df, validation_df = basic_clean_train_df, basic_clean_validation_df
+pre_time = datetime.now()
+train_df = preprocess_tweets(corona_train_df, process_sentence)
+validation_df = preprocess_tweets(corona_validation_df, process_sentence)
+pre_time = datetime.now() - pre_time
+print("preprocessing time:", pre_time.total_seconds(), "sec\n")
+
+train_df.to_csv(abs_path("data/nb/clean.csv"))
+# generate_word_cloud(df_to_list(train_df))
+# generate_word_cloud(df_to_list(validation_df))
 
 nb = NaiveBayes()
+
+train_time = datetime.now()
 nb.train_params(train_df)
+train_time = datetime.now() - train_time
+print("Training time:", train_time.total_seconds(), "sec\n")
+
+inf_time = datetime.now()
 nb.print_test_result(train_df, validation_df)
+inf_time = datetime.now() - inf_time
+print("Inference time:", inf_time.total_seconds(), "sec")
 
 
 def part_b_c():
@@ -191,4 +261,4 @@ def part_b_c():
     print()
 
 
-part_b_c()
+# part_b_c()
