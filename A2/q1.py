@@ -17,40 +17,6 @@ corona_validation_df = pd.read_csv(abs_path("data/nb/Corona_validation.csv"), he
 # print(Corona_train_df["CoronaTweet"].dtype)
 
 
-def tokenize_main(s):
-    """First cleans the sentences and tokenizes"""
-    # tokenized = tokenizer.tokenize(s)
-    tokenized = s.split()
-    # print(tokenized)
-    return tokenized
-
-
-def preprocessing(s):
-    return tokenize_main(s)
-
-
-def clean_tweet_data(df):
-    tweet_ser = df["CoronaTweet"]
-    tweet_ser_tokenized = tweet_ser.apply(preprocessing)
-    df.drop(["CoronaTweet"], axis=1, inplace=True)
-    df.insert(2, "CoronaTweet", tweet_ser_tokenized)
-
-
-clean_tweet_data(corona_train_df)
-clean_tweet_data(corona_validation_df)
-
-
-def generate_vocab(sentences):
-    vocab = dict()
-    for sentence in sentences:
-        for word in sentence:
-            vocab[word] = 1
-    return vocab
-
-
-# v = generate_vocab(corona_train_df["CoronaTweet"])
-
-
 class NaiveBayes:
     def __init__(
         self,
@@ -67,11 +33,11 @@ class NaiveBayes:
         self.class_header = class_header
         self.data_header = data_header
 
-        self.y_id_inv = dict()
-        for key in self.y_id.keys():
-            value = self.y_id[key]
-            self.y_id_inv[value] = key
-            # For using in inference
+        # self.y_id_inv = dict()
+        # for key in self.y_id.keys():
+        #     value = self.y_id[key]
+        #     self.y_id_inv[value] = key
+        # For using in inference
 
     def train_params(self, df):
         k = self.k
@@ -120,7 +86,7 @@ class NaiveBayes:
                 lpx_y += np.log10(pxi_y)  # P(X=sentence|Y) = Prod[ P(X=word|Y) ]
             lpy[yi] = lpx_y + np.log10(self.phi_y[yi])
             # P(Y=yi|X=x) ~ P(X=x|Y=yi) * P(Y=yi)
-        return self.y_id_inv[lpy.index(max(lpy))]
+        return ["Negative", "Neutral", "Positive"][lpy.index(max(lpy))]
 
     def test(self, df, inf_func=None):
         inf_func = inf_func if inf_func else self.inference
@@ -132,11 +98,97 @@ class NaiveBayes:
             cm[real, inf] += 1
         return cm.trace() / cm.sum(), cm
 
+    def print_test_result(self, train_df, test_df, inf_func=None):
+        train_val = self.test(train_df, inf_func)
+        test_val = self.test(test_df, inf_func)
+        print(
+            f"Accuracy on training data: {100*train_val[0]:.2f} %\n\n",
+            "Confusion matrix:\n",
+            train_val[1],
+            f"\nTrace: {train_val[1].trace()}\n",
+            "\n",
+        )
+        print(
+            f"Accuracy on validation data: {100*test_val[0]:.2f} %\n\n",
+            "Confusion matrix:\n",
+            test_val[1],
+            f"\nTrace: {test_val[1].trace()}\n",
+        )
+
+
+"""Data Preproccessing"""
+
+custom_stopwords = {"https", "t", "co"}
+
+
+def tokenize_main(s):
+    """First cleans the sentences and tokenizes"""
+    # tokenized = tokenizer.tokenize(s)
+    tokenized = s.split()
+    # print(tokenized)
+    return tokenized
+
+
+def preprocessing_basic(s):
+    return tokenize_main(s)
+
+
+def preprocess_tweets(df, preprocessing_func):
+    tweet_ser = df["CoronaTweet"]
+    tweet_ser_tokenized = tweet_ser.apply(preprocessing_func)
+    df_new = df.drop(["CoronaTweet"], axis=1)
+    df_new.insert(2, "CoronaTweet", tweet_ser_tokenized)
+    return df_new
+
+
+"""Word clouds"""
+
+
+def generate_word_cloud(df, data_header="CoronaTweet"):
+    from wordcloud import WordCloud, STOPWORDS
+
+    stopwords = set(STOPWORDS).union(custom_stopwords)
+    wc = WordCloud(background_color="white", max_words=2000, stopwords=stopwords)
+    data = " ".join(df[data_header])
+    wc.generate(data)
+    plt.imshow(wc, interpolation="bilinear")
+    plt.axis("off")
+    plt.show()
+
+
+# generate_word_cloud(corona_train_df)
+# generate_word_cloud(corona_validation_df)
+
+basic_clean_train_df = preprocess_tweets(corona_train_df, preprocessing_basic)
+basic_clean_validation_df = preprocess_tweets(corona_validation_df, preprocessing_basic)
+
+# generate_word_cloud(corona_train_df)
+# generate_word_cloud(corona_validation_df)
+
+"""Main execution"""
+
+
+train_df, validation_df = basic_clean_train_df, basic_clean_validation_df
 
 nb = NaiveBayes()
-nb.train_params(corona_train_df)
-test_set_result = nb.test(corona_validation_df)
-train_set_result = nb.test(corona_train_df)
+nb.train_params(train_df)
+nb.print_test_result(train_df, validation_df)
 
-print("Accuracy on test", test_set_result[0], "\n", test_set_result[1])
-print("Accuracy on train", train_set_result[0], "\n", train_set_result[1])
+
+def part_b_c():
+    def random_model(x):
+        return ["Negative", "Neutral", "Positive"][np.random.randint(0, 3)]
+
+    def const_model(x, i=2):
+        return ["Negative", "Neutral", "Positive"][i]
+
+    print("\nFor model:\n")
+    nb.print_test_result(train_df, validation_df)
+    print("\nFor random:\n")
+    nb.print_test_result(train_df, validation_df, random_model)
+    print("\nFor positive model:\n")
+    nb.print_test_result(train_df, validation_df, const_model)
+    print()
+
+
+part_b_c()
