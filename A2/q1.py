@@ -21,26 +21,23 @@ class NaiveBayes:
         class_mapping={"Negative": 0, "Neutral": 1, "Positive": 2},
         class_header="Sentiment",
         data_header="CoronaTweet",
+        bigram=False,
+        bigram_weight=0.85,
     ):
         self.y_id = class_mapping
         self.k = len(self.y_id)
-        self.phi_x = []
-        for i in range(self.k):
-            self.phi_x.append(dict())
+        self.phi_x = [dict() for i in range(self.k)]
         self.phi_y = [0] * self.k
         self.class_header = class_header
         self.data_header = data_header
+        self.logV = 0
+        self.bigram = bigram
+        self.bigram_weight = bigram_weight
 
-        # self.y_id_inv = dict()
-        # for key in self.y_id.keys():
-        #     value = self.y_id[key]
-        #     self.y_id_inv[value] = key
-        # For using in inference
+        self.phi_x2 = [dict() for i in range(self.k)]
 
     def train_params(self, df):
-        k = self.k
-        phi_x = self.phi_x
-        phi_y = self.phi_y
+        k, phi_x, phi_y = self.k, self.phi_x, self.phi_y
         phi_x_denom = [0] * k
 
         # O(m) or O(words in data)
@@ -65,12 +62,46 @@ class NaiveBayes:
 
         # O(V)
         # dividing by denom and Laplace smoothing
-        for word in phi_x[0].keys():
-            for yi in range(k):
+        for yi in range(k):
+            for word in phi_x[yi]:
                 phi_x[yi][word] += 1
                 phi_x[yi][word] /= phi_x_denom[yi] + V
+            phi_y[yi] = np.log10(phi_y[yi]) - np.log10(m)
+        # for yi in range(k):
+        self.logV = np.log10(len(phi_x[0]))
+
+        if self.bigram:
+            self.train_bigrams(df)
+
+    def train_bigrams(self, df):
+        k, phi_x2 = self.k, self.phi_x2
+        phi_x2_denom = [0] * self.k
+        for r in range(len(df)):
+            y = self.y_id[df.loc[r, self.class_header]]
+            sentence = df.loc[r, self.data_header]
+            for i in range(len(sentence)):
+                word = sentence[i]
+                prev = "<start>" if i == 0 else sentence[i - 1]
+                d = phi_x2[y]
+                if prev not in d:
+                    for yi in range(k):
+                        phi_x2[yi][prev] = {word: 0}
+                elif word not in d[prev]:
+                    for yi in range(k):
+                        phi_x2[yi][prev][word] = 0
+                d[prev][word] += 1
+                phi_x2_denom[y] += 1
+            # phi_y[y] += 1
+        V = len(self.phi_x[0])
         for yi in range(k):
-            phi_y[yi] /= m
+            for prev in phi_x2[yi]:
+                for word in phi_x2[yi][prev]:
+                    phi_x2[yi][prev][word] += 1
+                    phi_x2[yi][prev][word] /= phi_x2_denom[yi] + V
+
+            # phi_y[yi] = np.log10(phi_y[yi]) - np.log10(m)
+
+        # for prev in phi
 
     def inference(self, sentence):
         V = len(self.phi_x[0])
@@ -79,12 +110,29 @@ class NaiveBayes:
         # sentence = series.loc(r, "CoronaTweet")
         for yi in range(self.k):
             lpx_y = 0
-            for word in sentence:
-                pxi_y = self.phi_x[yi][word] if word in self.phi_x[0] else 1 / V
-                lpx_y += np.log10(pxi_y)  # P(X=sentence|Y) = Prod[ P(X=word|Y) ]
-            lpy[yi] = lpx_y + np.log10(self.phi_y[yi])
+            for i in range(len(sentence)):
+                word = sentence[i]
+                pxi_y = 0
+                if not self.bigram:
+                    pxi_y = (
+                        np.log10(self.phi_x[yi][word])
+                        if word in self.phi_x[yi]
+                        else -self.logV
+                    )
+                else:
+                    prev = "<start>" if i == 0 else sentence[i - 1]
+                    uni = self.phi_x[yi][word] if word in self.phi_x[yi] else 1 / V
+                    bi = 1 / V
+                    if prev in self.phi_x2[yi]:
+                        if word in self.phi_x2[yi][prev]:
+                            bi = self.phi_x2[yi][prev][word]
+                    w = self.bigram_weight
+                    pxi_y = np.log10((1 - w) * uni + w * bi)
+
+                lpx_y += pxi_y  # P(X=sentence|Y) = Prod[ P(X=word|Y) ]
+            lpy[yi] = lpx_y + self.phi_y[yi]
             # P(Y=yi|X=x) ~ P(X=x|Y=yi) * P(Y=yi)
-        return ["Negative", "Neutral", "Positive"][lpy.index(max(lpy))]
+        return ["Negative", "Neutral", "Positive"][np.argmax(lpy)]
 
     def test(self, df, inf_func=None):
         inf_func = inf_func if inf_func else self.inference
@@ -124,15 +172,14 @@ import wordcloud
 
 # wordsegment.load()
 
-custom_stopwords = {"https", "t", "co"}
+custom_stopwords = {"https", "t", "co", "amp"}
 nltk_stopwords = set(nltk.corpus.stopwords.words("english"))
 # nltk.download("stopwords")
 # nltk.download("wordnet")
 stopwords = nltk_stopwords.union(custom_stopwords)
-
-tw_tokenizer = nltk.tokenize.TweetTokenizer()
-re_tokenizer = nltk.tokenize.RegexpTokenizer("[\w']+")
-# re_tokenizer only outputs [a-z0-9_'], no #, @ or other symbols.
+# tw_tokenizer = nltk.tokenize.TweetTokenizer()
+re_tokenizer = nltk.tokenize.RegexpTokenizer("[a-z0-9]+'*[a-z0-9]*")
+# re_tokenizer only outputs alphanumeric with ' allowed in between chars(they'll, etc), no #, @ or other symbols.
 
 stemmer = nltk.stem.PorterStemmer()
 lemmatizer = nltk.stem.WordNetLemmatizer()
@@ -160,12 +207,10 @@ def segment_hashtags(token):
 def process_tokens(s_tokens):
     ans = []
     for token in s_tokens:
-        if token in stopwords or token.isnumeric():
+        if token in stopwords or token.isnumeric() or len(token) < 3:
             continue
-        if len(token) > 1:
-            ans.append(lemmatizer.lemmatize(token))
-            # ans.append(stemmer.stem(token))
-
+        ans.append(lemmatizer.lemmatize(token))
+        # ans.append(stemmer.stem(token))
     return ans
 
 
@@ -229,10 +274,10 @@ pre_time = datetime.now() - pre_time
 print("preprocessing time:", pre_time.total_seconds(), "sec\n")
 
 train_df.to_csv(abs_path("data/nb/clean.csv"))
-# generate_word_cloud(df_to_list(train_df))
+generate_word_cloud(df_to_list(train_df))
 # generate_word_cloud(df_to_list(validation_df))
 
-nb = NaiveBayes()
+nb = NaiveBayes(bigram=True)
 
 train_time = datetime.now()
 nb.train_params(train_df)
