@@ -273,7 +273,7 @@ validation_df = preprocess_tweets(corona_validation_df, process_sentence)
 pre_time = datetime.now() - pre_time
 print("preprocessing time:", pre_time.total_seconds(), "sec\n")
 
-train_df.to_csv(abs_path("data/nb/clean.csv"))
+# train_df.to_csv(abs_path("data/nb/clean.csv"))
 generate_word_cloud(df_to_list(train_df))
 # generate_word_cloud(df_to_list(validation_df))
 
