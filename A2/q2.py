@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from cvxopt import matrix, solvers
 from datetime import datetime
-from numba import jit
+
 
 now = datetime.now
 
@@ -24,17 +24,17 @@ def process_img(img):
 train_p, train_n = [], []
 val_p, val_n = [], []
 
-for f in os.scandir(abs_path("data/svm/train/3")):
+for f in os.scandir(abs_path("data/svm/train/1")):
     img = Image.open(f.path)
     train_p.append(process_img(img))
-for f in os.scandir(abs_path("data/svm/train/4")):
+for f in os.scandir(abs_path("data/svm/train/2")):
     img = Image.open(f.path)
     train_n.append(process_img(img))
 
-for f in os.scandir(abs_path("data/svm/val/3")):
+for f in os.scandir(abs_path("data/svm/val/1")):
     img = Image.open(f.path)
     val_p.append(process_img(img))
-for f in os.scandir(abs_path("data/svm/val/4")):
+for f in os.scandir(abs_path("data/svm/val/2")):
     img = Image.open(f.path)
     val_n.append(process_img(img))
 
@@ -55,27 +55,36 @@ val_y = np.concatenate(
 
 
 class SVM:
-    def __init__(self, C=1, kernel="linear"):
-        # self.train_x = train_x
-        # self.train_y = train_y
+    def __init__(self, kernel="linear", C=1, g_lambda=1e-3):
         self.C = C
-        kernel_map = {"linear": self.K_linear}
+        kernel_map = {"linear": self.K_linear, "gaussian": self.K_gaussian}
         self.K = kernel_map[kernel]
+        self.g_lambda = g_lambda
 
     def K_linear(self, X1, X2):
         return np.dot(X1, X2.T)
+
+    def K_gaussian(self, X1, X2):
+        z = X1.shape[-1]
+        m, k = int(X1.size / z), int(X2.size / z)
+        # norm = np.linalg.norm((X1 - X2), 2, -1)  # (k,m)
+        norm = np.maximum(
+            (X1**2).sum(axis=-1).reshape((1, m))
+            + (X2**2).sum(axis=-1).reshape((k, 1))
+            - 2 * np.dot(X1, X2.T).T,  # (k,m)
+            0,
+        )  # (k,m)
+        prod = np.exp(-self.g_lambda * (norm))
+        return prod.T
 
     def train(self, train_x, train_y):
         C = self.C
         print("Generating CVXOPT params")
         t = now()
 
-        P = np.ones((m, m))
-        for i in range(m):
-            for j in range(m):
-                P[i, j] *= (
-                    train_y[i, 0] * train_y[j, 0] * self.K(train_x[i], train_x[j])
-                )
+        y_i, y_j = train_y.reshape((1, m)), train_y.reshape((m, 1))
+        K_val = self.K(train_x, train_x)
+        P = y_i * y_j * K_val
         q = -1 * np.ones(m)
         G = np.concatenate([-1 * np.identity(m), np.identity(m)])
         h = np.concatenate([np.zeros(m), C * np.ones(m)])
@@ -96,15 +105,14 @@ class SVM:
         sols = np.array(sol["x"])
         print("time taken:", now() - t, "\n")
 
-        sols.dump("sols.npy")
-        sols = np.load("sols.npy", allow_pickle=True)
+        # sols.dump(abs_path("data/sols_12_gaussian.npy"))
 
         sv_pos = sols.flatten() > 1e-6
         self.m_sv = np.count_nonzero(sv_pos)  # 3066
         self.alpha = sols[sv_pos].reshape((self.m_sv, 1))  # (m,1)
         self.X_sv = train_x[sv_pos, :]  # (m,768)
         self.y_sv = train_y[sv_pos, :]  # (m,1)
-        self.b = np.mean(self.y_sv - self.wx(self.X_sv))  # -0.7401936390874317
+        self.b = np.mean(self.y_sv - self.wx(self.X_sv))
 
     def train_precomputed(self, sols):
         sv_pos = sols.flatten() > 1e-6
@@ -113,10 +121,9 @@ class SVM:
         self.X_sv = train_x[sv_pos, :]  # (m,768)
         self.y_sv = train_y[sv_pos, :]  # (m,1)
 
-        b = np.mean(self.y_sv - self.wx(self.X_sv))  # -0.7401936390874317
+        b = np.mean(self.y_sv - self.wx(self.X_sv))
         # p, n = self.y_sv.flatten() == 1, self.y_sv.flatten() == -1
         # b = -0.5 * np.max(self.wx(self.X_sv[n, :])) + np.min(self.wx(self.X_sv[p, :]))
-        # # -0.6591808870930791
         self.b = b
 
     def wx(self, X_test):
@@ -133,8 +140,9 @@ class SVM:
         print(f"Accuracy: {100 * np.mean(ans) :.2f}%")
 
 
-# sols = np.load("solstice.npz", allow_pickle=True)
-sols = np.load("sols.npy", allow_pickle=True)
-s = SVM()
-s.train(sols)
+# sols = np.load(abs_path("data/sols_12_gaussian.npy"), allow_pickle=True)
+s = SVM(kernel="gaussian")
+# s = SVM(kernel="linear")
+s.train(train_x, train_y)
+# s.train_precomputed(sols)
 s.test(val_x, val_y)
