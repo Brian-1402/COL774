@@ -151,7 +151,7 @@ class NaiveBayes:
         if print_matrix:
             print(
                 "\n\nConfusion matrix:\n",
-                train_val[1],
+                np.flip(train_val[1]).T,
                 f"\nTrace: {train_val[1].trace()}\n",
                 "\n",
             )
@@ -159,7 +159,7 @@ class NaiveBayes:
         if print_matrix:
             print(
                 "\n\nConfusion matrix:\n",
-                test_val[1],
+                np.flip(test_val[1]).T,
                 f"\nTrace: {test_val[1].trace()}\n",
             )
 
@@ -211,11 +211,12 @@ def process_tokens(s_tokens):
             continue
         ans.append(lemmatizer.lemmatize(token))
         # ans.append(stemmer.stem(token))
+        # ans.append(token)
     return ans
 
 
 def process_sentence(s):
-    s = html.unescape(s)  # convert &amp; to &, &lt; to < etc.
+    s = html.unescape(s)  #
     s = s.lower()
     # s = unicodedata.normalize("NFKD", s)
     # # converts non ascii characters to their closest ascii char. Like ā to a.
@@ -229,11 +230,11 @@ def process_sentence(s):
     return processed
 
 
-def preprocess_tweets(df, preprocessing_func):
-    tweet_ser = df["CoronaTweet"]
+def preprocess_tweets(df, preprocessing_func, data_header="CoronaTweet"):
+    tweet_ser = df[data_header]
     tweet_ser_tokenized = tweet_ser.apply(preprocessing_func)
-    df_new = df.drop(["CoronaTweet"], axis=1)
-    df_new.insert(2, "CoronaTweet", tweet_ser_tokenized)
+    df_new = df.drop([data_header], axis=1)
+    df_new.insert(2, data_header, tweet_ser_tokenized)
     return df_new
 
 
@@ -241,7 +242,7 @@ def preprocess_tweets(df, preprocessing_func):
 
 
 def generate_word_cloud(data):
-    stopwords = set(wordcloud.STOPWORDS).union(custom_stopwords)
+    stopwords = set(wordcloud.STOPWORDS)
     wc = wordcloud.WordCloud(
         background_color="white",
         max_words=2000,
@@ -258,39 +259,54 @@ def generate_word_cloud(data):
 """Misc"""
 
 
-def df_to_list(df, data_header="CoronaTweet"):
-    data = df[data_header].explode().tolist()
+def df_to_list(
+    df, class_type=None, data_header="CoronaTweet", class_header="Sentiment"
+):
+    if class_type:
+        data = df[df[class_header] == class_type][data_header].explode().tolist()
+    else:
+        data = df[data_header].explode().tolist()
     data = [str(i) for i in data]
     return data
 
 
 """Main execution"""
 
+pre_time = datetime.now()
+train_df = preprocess_tweets(corona_train_df, preprocessing_basic)
+validation_df = preprocess_tweets(corona_validation_df, preprocessing_basic)
+pre_time = datetime.now() - pre_time
+print("basic preprocessing time:", pre_time.total_seconds(), "sec\n")
 
 pre_time = datetime.now()
-train_df = preprocess_tweets(corona_train_df, process_sentence)
-validation_df = preprocess_tweets(corona_validation_df, process_sentence)
+train_df_c = preprocess_tweets(corona_train_df, process_sentence)
+validation_df_c = preprocess_tweets(corona_validation_df, process_sentence)
 pre_time = datetime.now() - pre_time
-print("preprocessing time:", pre_time.total_seconds(), "sec\n")
+print("thorough preprocessing time:", pre_time.total_seconds(), "sec\n")
 
-# train_df.to_csv(abs_path("data/nb/clean.csv"))
-generate_word_cloud(df_to_list(train_df))
-# generate_word_cloud(df_to_list(validation_df))
 
-nb = NaiveBayes(bigram=True)
+def part_a():
+    generate_word_cloud(df_to_list(train_df, "Positive"))
+    generate_word_cloud(df_to_list(train_df, "Neutral"))
+    generate_word_cloud(df_to_list(train_df, "Negative"))
 
-train_time = datetime.now()
-nb.train_params(train_df)
-train_time = datetime.now() - train_time
-print("Training time:", train_time.total_seconds(), "sec\n")
+    nb = NaiveBayes(bigram=False)
 
-inf_time = datetime.now()
-nb.print_test_result(train_df, validation_df)
-inf_time = datetime.now() - inf_time
-print("Inference time:", inf_time.total_seconds(), "sec")
+    train_time = datetime.now()
+    nb.train_params(train_df)
+    train_time = datetime.now() - train_time
+    print("Training time:", train_time.total_seconds(), "sec\n")
+
+    inf_time = datetime.now()
+    nb.print_test_result(train_df, validation_df)
+    inf_time = datetime.now() - inf_time
+    print("Inference time:", inf_time.total_seconds(), "sec")
 
 
 def part_b_c():
+    nb = NaiveBayes(bigram=False)
+    nb.train_params(train_df)
+
     def random_model(x):
         return ["Negative", "Neutral", "Positive"][np.random.randint(0, 3)]
 
@@ -298,12 +314,72 @@ def part_b_c():
         return ["Negative", "Neutral", "Positive"][i]
 
     print("\nFor model:\n")
-    nb.print_test_result(train_df, validation_df)
+    nb.print_test_result(train_df, validation_df, print_matrix=True)
     print("\nFor random:\n")
-    nb.print_test_result(train_df, validation_df, random_model)
+    nb.print_test_result(train_df, validation_df, random_model, print_matrix=True)
     print("\nFor positive model:\n")
-    nb.print_test_result(train_df, validation_df, const_model)
+    nb.print_test_result(train_df, validation_df, const_model, print_matrix=True)
     print()
 
 
+def part_d():
+    generate_word_cloud(df_to_list(train_df_c, "Positive"))
+    generate_word_cloud(df_to_list(train_df_c, "Neutral"))
+    generate_word_cloud(df_to_list(train_df_c, "Negative"))
+
+    nb = NaiveBayes(bigram=False)
+    nb.train_params(train_df_c)
+    nb.print_test_result(train_df_c, validation_df_c)
+
+
+# part_a()
 # part_b_c()
+# part_d()
+
+train_df_c.rename(columns={"CoronaTweet": "Tweet"}, inplace=True)
+da_sizes = [1, 2, 5, 10, 25, 50, 100]
+da_list = []
+for i in da_sizes:
+    df = pd.read_csv(
+        abs_path(f"data/nb/Domain_Adaptation/Twitter_train_{i}.csv"), header=0
+    )
+    da_list.append(preprocess_tweets(df, process_sentence, "Tweet"))
+
+da_val_ = pd.read_csv(
+    abs_path(f"data/nb/Domain_Adaptation/Twitter_validation.csv"), header=0
+)
+da_val = preprocess_tweets(da_val_, process_sentence, "Tweet")
+
+
+def part_f():
+    print("For domain adaptation")
+    acc_source = []
+    acc_nosource = [0]
+    nb = NaiveBayes(bigram=False, data_header="Tweet")
+    nb.train_params(train_df_c)
+    acc_source.append(nb.test(da_val)[0])
+
+    for i in range(6):
+        print(f"For size {da_sizes[i]}%\ncombined with corona tweets:")
+        train_df_new = pd.concat([train_df_c, da_list[i]])
+        train_df_new.reset_index(drop=True, inplace=True)
+
+        nb1 = NaiveBayes(bigram=False, data_header="Tweet")
+        nb1.train_params(train_df_new)
+        acc = nb1.test(da_val)[0]
+        print(f"Accuracy:{acc}")
+        acc_source.append(acc)
+        print(f"Without corona tweets")
+        nb2 = NaiveBayes(bigram=False, data_header="Tweet")
+        nb2.train_params(da_list[i])
+        acc = nb2.test(da_val)[0]
+        print(f"Accuracy:{acc}")
+        acc_nosource.append(acc)
+    plt.plot(da_sizes, acc_source, color="b", label="With source")
+    plt.plot(da_sizes, acc_nosource, color="r", label="Without source")
+    plt.xlabel("Split size %")
+    plt.ylabel("Prediction accuracy %")
+    plt.show()
+
+
+part_f()
