@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import copy
+import time
 
 label_encoder = None
 
@@ -11,15 +12,16 @@ def abs_path(relative_pos):
     return os.path.join(os.path.dirname(__file__), relative_pos)
 
 
-def get_np_array(file_name):
+def get_np_array(file_name, one_hot=False):
     global label_encoder
     data = pd.read_csv(file_name)
-    #! How are we sure that categorical data is in the same order in train and test
-    #! Also how do we know that all the categories are present in both train and test
-    #! Need to maintain a separate list of categories for each column
     need_label_encoding = ["team", "host", "opp", "month", "day_match"]
     if label_encoder is None:
-        label_encoder = OrdinalEncoder()
+        if one_hot:
+            label_encoder = OneHotEncoder(sparse_output=False)
+        else:
+            label_encoder = OrdinalEncoder()
+
         label_encoder.fit(data[need_label_encoding])
     data_1 = pd.DataFrame(
         label_encoder.transform(data[need_label_encoding]),
@@ -39,16 +41,19 @@ def get_np_array(file_name):
     ]
     data_2 = data[dont_need_label_encoding]
     final_data = pd.concat([data_1, data_2], axis=1)
-
+    labels = list(final_data.columns)[:-1]
     features_info = dict()
-    features_info["num_features"] = len(final_data.columns) - 1
-    features_info["names"] = (need_label_encoding + dont_need_label_encoding)[:-1]
-    features_info["values"] = [None] * len(features_info["names"])
-    for i in range(len(label_encoder.categories_)):  # 0 to 4
-        features_info["values"][i] = list(range(len(label_encoder.categories_[i])))
-    features_info["values"][6] = [0, 1]
-    features_info["values"][7] = [0, 1]
-    features_info["values"][8] = [0, 1]
+    features_info["num_features"] = len(labels)
+    features_info["names"] = labels
+    features_info["values"] = [[0, 1] for i in range(len(labels))]
+    if not one_hot:
+        for i in range(len(label_encoder.categories_)):  # 0 to 4
+            features_info["values"][i] = list(range(len(label_encoder.categories_[i])))
+    features_info["values"][-7] = None  # year
+    features_info["values"][-3] = None  # fow
+    features_info["values"][-2] = None  # score
+    features_info["values"][-1] = None  # rpo
+
     features_info["types"] = [
         "cat",  # 0. team
         "cat",  # 1. host
@@ -64,6 +69,12 @@ def get_np_array(file_name):
         "cont",  # 11. rpo
     ]
     # features_info["value_names"]=[]
+    if one_hot:
+        while len(features_info["types"]) != len(labels):
+            features_info["types"] = ["cat"] + features_info["types"]
+        # features_info["values"] = features_info["values"][5:]
+        # while len(features_info["values"]) != len(labels):
+        #     features_info["values"] = [0, 1] + features_info["values"]
 
     X = final_data.iloc[:, :-1]
     y = final_data.iloc[:, -1:]
@@ -289,13 +300,73 @@ class DTTree:
         pass
 
 
-if __name__ == "__main__":
+def _part_a_b_c(one_hot=False, prune=False, depths=[5, 10, 15, 20, 25]):
     # change the path if you want
-    X_train, y_train, features_info = get_np_array(abs_path("data/q1/train.csv"))
-    X_test, y_test, _ = get_np_array(abs_path("data/q1/test.csv"))
-    max_depth = 45
+    global label_encoder
+    label_encoder = None
+    X_train, y_train, features_info = get_np_array(
+        abs_path("data/q1/train.csv"), one_hot
+    )
+    X_test, y_test, _ = get_np_array(abs_path("data/q1/test.csv"), one_hot)
     tree = DTTree()
-    tree.fit(X_train, y_train, features_info, max_depth=max_depth)
-    y_test_infers = tree(X_train)
-    print(f"Accuracy: { np.sum(y_test_infers == y_train)/len(y_train)*100 :.2f}%")
-    pass
+    train_accs = []
+    test_accs = []
+    for depth in depths:
+        t = time.time()
+        tree.fit(X_train, y_train, features_info, max_depth=depth)
+        t2 = time.time() - t
+        train_acc = np.sum(tree(X_train) == y_train) / len(y_train) * 100
+        test_acc = np.sum(tree(X_test) == y_test) / len(y_test) * 100
+        print(
+            f"Depth: {depth}, Train Acc: {train_acc:.2f}%, Test Acc: {test_acc:.2f}%, Time: {t2:.2f}s"
+        )
+        train_accs.append(train_acc)
+        test_accs.append(test_acc)
+    return train_accs, test_accs
+
+
+def part_a():
+    import matplotlib.pyplot as plt
+
+    print("\nPart A:")
+    depths = [5, 10, 15, 20, 25]
+    train_accs, test_accs = _part_a_b_c(one_hot=False, prune=False, depths=depths)
+    plt.plot(depths, train_accs, label="Train Acc", color="red", marker="o")
+    plt.plot(depths, test_accs, label="Test Acc", color="blue", marker="o")
+    plt.legend(loc="best")
+    plt.xlabel("Depth")
+    plt.ylabel("Accuracies")
+    plt.title("Part A")
+    plt.show()
+
+
+def part_b():
+    import matplotlib.pyplot as plt
+
+    print("\nPart B:")
+    depths = [15, 25, 35, 45]
+    print("Using one-hot encoding:")
+    b_train_accs, b_test_accs = _part_a_b_c(one_hot=True, prune=False, depths=depths)
+    # fig, plt = plt.subplots()
+    plt.plot(depths, b_train_accs, label="Train Acc", color="red", marker="o")
+    plt.plot(depths, b_test_accs, label="Test Acc", color="blue", marker="o")
+    plt.legend(loc="best")
+    plt.xlabel("Depth")
+    plt.ylabel("Accuracies")
+    plt.title("With One-hot encoding")
+    # plt.set(ylim=[50, 110])
+    plt.show()
+    print("\nWithout one-hot encoding:")
+    a_train_accs, a_test_accs = _part_a_b_c(one_hot=False, prune=False, depths=depths)
+    plt.plot(depths, a_train_accs, label="Train Acc", color="red", marker="o")
+    plt.plot(depths, a_test_accs, label="Test Acc", color="blue", marker="o")
+    plt.legend(loc="best")
+    plt.xlabel("Depth")
+    plt.ylabel("Accuracies")
+    plt.title("Without one-hot encoding")
+    # plt.set(ylim=[50, 110])
+    plt.show()
+
+
+if __name__ == "__main__":
+    part_b()

@@ -21,3 +21,5 @@ A3/data/**/*.zip
 A3/data/**/*.csv
 A3/data/**/*.npy
 A3/data/**/*.txt
+
+*synctex.gz
