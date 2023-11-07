@@ -67,9 +67,9 @@ class NeuralLayer:
         self.theta = np.random.randn(output_size, input_size) / np.sqrt(input_size)
         self.theta = np.concatenate((self.theta, np.zeros((output_size, 1))), axis=1)
         # theta shape = (output_size, input_size+1)
-        self.delj = None  # shape = (m, output_size, 1)
-        self.input = None  # shape = (m, 1, input_size+1)
-        self.output = None  # shape = (m, 1, output_size)
+        self.delj = None  # shape = (m, output_size)
+        self.input = None  # shape = (m, input_size+1)
+        self.output = None  # shape = (m, output_size)
         self.is_input = is_input
         self.is_output = is_output
         self.activation = activation
@@ -83,21 +83,21 @@ class NeuralLayer:
         elif self.activation == "softmax":
             netj -= np.max(netj)
             exps = np.exp(netj)
-            return exps / np.sum(exps, axis=2, keepdims=True)
+            return exps / np.sum(exps, axis=1, keepdims=True)
 
-    def del_activ(self, output):
+    def del_activ(self, netj):
         if self.activation == "relu":
-            return np.where(output > 0, 1, 0.001)
+            return np.where(netj > 0, 1, 0.001)
         elif self.activation == "sigmoid":
+            output = self.activ(netj)
             return output * (1 - output)
-        #! change afterwards
 
     def layer_output(self):
         if not self.is_output:
             output = self.output
         else:
-            predicted_indices = np.argmax(self.output, axis=2)
-            output = np.eye(self.output.shape[2])[predicted_indices]
+            predicted_indices = np.argmax(self.output, axis=1)
+            output = np.eye(self.output.shape[1])[predicted_indices]
         return output
 
     def push_forward(self, inputs):
@@ -105,22 +105,22 @@ class NeuralLayer:
         # one alternative is to consider a "bias perceptron" for which everything gets computed normally,
         # but in the end, the output is replaced to 1. This change is made in activation funcs
         # t = time.time()
-        self.input = np.concatenate((inputs, np.ones((inputs.shape[0], 1, 1))), axis=2)
+        self.input = np.concatenate((inputs, np.ones((inputs.shape[0], 1))), axis=1)
         # self.input = inputs
-        netj = self.input @ self.theta.T  # shape = (m, 1, output_size)
-        self.output = self.activ(netj)
+        self.netj = self.input @ self.theta.T  # shape = (m, output_size)
+        self.output = self.activ(self.netj)
         # print(time.time() - t)
         output = self.layer_output()
         return output
 
     def push_backward(self, delj_down=None, theta_down=None, y=None):
         if not self.is_output:
-            del_ac = self.del_activ(self.output)
+            del_ac = self.del_activ(self.netj)
             del_ac.shape = (del_ac.shape[0], del_ac.shape[2], del_ac.shape[1])
             self.delj = (theta_down.T[:-1, :] @ delj_down) * del_ac
 
             input_down = np.concatenate(
-                (self.output, np.ones((self.output.shape[0], 1, 1))), axis=2
+                (self.output, np.ones((self.output.shape[0], 1))), axis=1
             )
             # theta_down -= (
             #     self.eta * np.sum(delj_down * input_down, axis=0) / delj_down.shape[0]
@@ -190,10 +190,10 @@ class NeuralNetwork:
         y_test = np.argmax(y_test, axis=2)
         return np.mean(y_pred == y_test) * 100
 
-    def train(self, X, y, epochs, r=32):
-        # r is batch size
+    def train(self, X, y, epochs, M=32):
+        # M is batch size
         out = None
-        m = X.shape[0]
+        m = X.shape[0]  # no. of samples
         X = X.reshape((X.shape[0], 1, X.shape[1]))  # (m,1,n)
         y = y.reshape((y.shape[0], 1, y.shape[1]))  # (m,1,r)
 
@@ -205,8 +205,8 @@ class NeuralNetwork:
             Xb, yb = X[perm], y[perm]
             print(f"Epoch {i+1}")
             c = 0
-            for b in range(1, m // r + 1):
-                B, y_b = Xb[(b - 1) * r : b * r, :, :], yb[(b - 1) * r : b * r, :, :]
+            for b in range(1, m // M + 1):
+                B, y_b = Xb[(b - 1) * M : b * M, ...], yb[(b - 1) * M : b * M, ...]
                 out = self.forward_prop(B)
                 # print(out, "\n\n\n")
                 # print(np.sum(out, axis=0), "")

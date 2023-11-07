@@ -237,7 +237,7 @@ class DTTree:
                 depth + 1,
             )
             node.add_child(child)
-            node.descendants += 1 + child.descendants
+            node.descendants += (1 + child.descendants) if child is not None else 0
         # print()
         return node
 
@@ -354,10 +354,10 @@ def get_data(one_hot=False):
 def _part_a_b(one_hot=False, prune=False, depths=[5, 10, 15, 20, 25]):
     # change the path if you want
     X_train, y_train, X_test, y_test, X_val, y_val, features_info = get_data(one_hot)
-    tree = DTTree()
     train_accs = []
     test_accs = []
     for depth in depths:
+        tree = DTTree()
         t = time.time()
         tree.fit(X_train, y_train, features_info, max_depth=depth)
         t2 = time.time() - t
@@ -383,7 +383,11 @@ def part_a():
     plt.xlabel("Depth")
     plt.ylabel("Accuracies")
     plt.title("Part A")
-    plt.show()
+    plt.axis([None, None, 0, 105])
+
+    # plt.show()
+    plt.savefig(abs_path(f"./report/images/q1_part_a.png"))
+
     plt.clf()
 
 
@@ -395,24 +399,29 @@ def part_b():
     print("Using one-hot encoding:")
     train_accs, test_accs = _part_a_b(one_hot=True, prune=False, depths=depths)
     # fig, plt = plt.subplots()
-    plt.plot(depths, train_accs, label="Train Acc", color="red", marker="o")
-    plt.plot(depths, test_accs, label="Test Acc", color="blue", marker="o")
-    plt.legend(loc="best")
-    plt.xlabel("Depth")
-    plt.ylabel("Accuracies")
-    plt.title("With One-hot encoding")
+    plt.plot(depths, train_accs, label="Train Acc one-hot", color="red", marker="o")
+    plt.plot(depths, test_accs, label="Test Acc one-hot", color="blue", marker="o")
+    # plt.legend(loc="best")
+    # plt.xlabel("Depth")
+    # plt.ylabel("Accuracies")
+    # plt.title("With One-hot encoding")
+    # plt.savefig(abs_path(f"./report/images/q1_part_b.png"))
+
     # plt.set(ylim=[50, 110])
-    plt.show()
+    # plt.show()
     print("\nWithout one-hot encoding:")
     a_train_accs, a_test_accs = _part_a_b(one_hot=False, prune=False, depths=depths)
-    plt.plot(depths, a_train_accs, label="Train Acc", color="red", marker="o")
-    plt.plot(depths, a_test_accs, label="Test Acc", color="blue", marker="o")
+    plt.plot(depths, a_train_accs, label="Train Acc k-way", color="orange", marker="o")
+    plt.plot(depths, a_test_accs, label="Test Acc k-way", color="teal", marker="o")
     plt.legend(loc="best")
     plt.xlabel("Depth")
     plt.ylabel("Accuracies")
-    plt.title("Without one-hot encoding")
+    plt.title("Part B")
+    plt.axis([None, None, 0, 105])
+
     # plt.set(ylim=[50, 110])
-    plt.show()
+    plt.savefig(abs_path(f"./report/images/q1_part_b.png"))
+    # plt.show()
     plt.clf()
 
 
@@ -456,5 +465,65 @@ def part_c():
         plt.clf()
 
 
+from sklearn.tree import DecisionTreeClassifier
+
+
+def part_d():
+    depths = [15, 25, 35, 45]
+    print("Part D")
+    X_train, y_train, X_test, y_test, X_val, y_val, features_info = get_data(True)
+    train_accs, test_accs, val_accs = [], [], []
+    for depth in depths:
+        tree = DecisionTreeClassifier(criterion="entropy", max_depth=depth)
+        t = time.time()
+        tree.fit(X_train, y_train)
+        t2 = time.time() - t
+
+        train_accs.append(tree.score(X_train, y_train) * 100)
+        test_accs.append(tree.score(X_test, y_test) * 100)
+        val_accs.append(tree.score(X_val, y_val) * 100)
+        print(
+            f"Time: {t2:.2f}s, Depth: {depth}, Train Acc: {train_accs[-1]:.2f}%, Test Acc: {test_accs[-1]:.2f}%, Val Acc: {val_accs[-1]:.2f}%",
+        )
+    plt.plot(depths, train_accs, label="Train", color="red", marker="o")
+    plt.plot(depths, test_accs, label="Test", color="blue", marker="o")
+    plt.plot(depths, val_accs, label="Val", color="orange", marker="o")
+    plt.legend(loc="best")
+    plt.xlabel("Depth")
+    plt.ylabel("Accuracies")
+    plt.axis([None, None, 0, 100])
+
+    plt.savefig(abs_path(f"./report/images/q1_part_d_depths.png"))
+    # plt.show()
+    plt.clf()
+
+    train_accs, test_accs, val_accs = [], [], []
+    alphas = [0.001, 0.01, 0.1, 0.2]
+    for alpha in alphas:
+        tree = DecisionTreeClassifier(criterion="entropy", ccp_alpha=alpha)
+        t = time.time()
+        tree.fit(X_train, y_train)
+        t2 = time.time() - t
+
+        print(tree.get_depth())
+        train_accs.append(tree.score(X_train, y_train) * 100)
+        test_accs.append(tree.score(X_test, y_test) * 100)
+        val_accs.append(tree.score(X_val, y_val) * 100)
+        print(
+            f"Time: {t2:.2f}s, Depth: {depth}, Train Acc: {train_accs[-1]:.2f}%, Test Acc: {test_accs[-1]:.2f}%, Val Acc: {val_accs[-1]:.2f}%",
+        )
+    plt.plot(alphas, train_accs, label="Train", color="red", marker="o")
+    plt.plot(alphas, test_accs, label="Test", color="blue", marker="o")
+    plt.plot(alphas, val_accs, label="Val", color="orange", marker="o")
+    plt.legend(loc="best")
+    plt.xlabel("ccp_alpha")
+    plt.ylabel("Accuracies")
+    plt.axis([None, None, 0, 100])
+
+    plt.savefig(abs_path(f"./report/images/q1_part_d_pruning.png"))
+    # plt.show()
+    plt.clf()
+
+
 if __name__ == "__main__":
-    part_c()
+    part_d()

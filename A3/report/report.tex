@@ -96,7 +96,7 @@
           \end{enumerate}
           \begin{center}
               \begin{tabular}{c}
-                  \includegraphics[width=0.9\textwidth]{./images/q1_a.png}
+                  \includegraphics[width=0.9\textwidth]{./images/q1_part_a.png}
               \end{tabular}
           \end{center}
 
@@ -135,7 +135,7 @@
           \end{enumerate}
           \begin{center}
               \begin{tabular}{c}
-                  \includegraphics[width=0.9\textwidth]{./images/q1_b.png}
+                  \includegraphics[width=0.9\textwidth]{./images/q1_part_b.png}
               \end{tabular}
           \end{center}
 
@@ -157,11 +157,11 @@
 
           Some observations to note:
           \begin{itemize}
-              \item Pruning, with one-hot encoding:
-                    Time: 35.92s, Depth: 15, Train Acc: 68.24%, Test Acc: 57.60%, Val Acc: 66.44%
-                    Time: 108.66s, Depth: 25, Train Acc: 78.22%, Test Acc: 61.22%, Val Acc: 71.72%
-                    Time: 158.27s, Depth: 35, Train Acc: 83.74%, Test Acc: 61.43%, Val Acc: 74.83%
-                    Time: 210.50s, Depth: 45, Train Acc: 89.96%, Test Acc: 60.70%, Val Acc: 78.62%
+              %   \item Pruning, with one-hot encoding:
+              %         Time: 35.92s, Depth: 15, Train Acc: 68.24%, Test Acc: 57.60%, Val Acc: 66.44%
+              %         Time: 108.66s, Depth: 25, Train Acc: 78.22%, Test Acc: 61.22%, Val Acc: 71.72%
+              %         Time: 158.27s, Depth: 35, Train Acc: 83.74%, Test Acc: 61.43%, Val Acc: 74.83%
+              %         Time: 210.50s, Depth: 45, Train Acc: 89.96%, Test Acc: 60.70%, Val Acc: 78.62%
               \item In all graphs the training accuracy decreases as number of nodes reduce in the graph (which suggests that more nodes could possibly lead to overfitting)
               \item Both the validation increases as number of nodes reduce in the graph
               \item we find that the test accuracies remain around the same value throughout the process
@@ -181,49 +181,65 @@
                     \begin{itemize}
                         \item Training Set Accuracies:
                               \begin{itemize}
-                                  \item Training Accuracy for max\_depth = 15 is 71.3428
-                                  \item Training Accuracy for max\_depth = 25 is 85.4734
-                                  \item Training Accuracy for max\_depth = 35 is 94.3529
-                                  \item Training Accuracy for max\_depth = 45 is 99.5528
+                                  % Updated
+                                  \item Training Accuracy for max\_depth = 15 is 71.32
+                                  \item Training Accuracy for max\_depth = 25 is 85.49
+                                  \item Training Accuracy for max\_depth = 35 is 94.35
+                                  \item Training Accuracy for max\_depth = 45 is 99.51
                               \end{itemize}
                         \item Test Set Accuracies:
                               \begin{itemize}
-                                  \item Test Accuracy for max\_depth = 15 is 60.5998
-                                  \item Test Accuracy for max\_depth = 25 is 63.3919
-                                  \item Test Accuracy for max\_depth = 35 is 64.6329
-                                  \item Test Accuracy for max\_depth = 45 is 64.0124
+                                  \item Test Accuracy for max\_depth = 15 is 60.29
+                                  \item Test Accuracy for max\_depth = 25 is 63.81
+                                  \item Test Accuracy for max\_depth = 35 is 65.15
+                                  \item Test Accuracy for max\_depth = 45 is 64.12
+                              \end{itemize}
+                        \item Validation Set Accuracies:
+                              \begin{itemize}
+                                  \item Validation Accuracy for max\_depth = 15 is 58.16
+                                  \item Validation Accuracy for max\_depth = 25 is 61.61
+                                  \item Validation Accuracy for max\_depth = 35 is 62.53
+                                  \item Validation Accuracy for max\_depth = 45 is 61.95
                               \end{itemize}
                     \end{itemize}
                     \newpage
                     The obtained graph is as follows:
                     \begin{center}
                         \begin{tabular}{c}
-                            \includegraphics[width=0.9\textwidth]{./images/q1_d_max_depth.png}
+                            \includegraphics[width=0.9\textwidth]{./images/q1_part_d_depths.png}
                         \end{tabular}
                     \end{center}
-                    We find that the best max\_depth obtained using the validation set is 45
+                    We find that the best max\_depth obtained using the validation set is 35
               \item Varying ccp\_alpha
                     \begin{itemize}
                         \item Training Set Accuracies:
+                              % Updated
                               \begin{itemize}
-                                  \item Training Accuracy for ccp\_alpha = 0.001 is 68.9408
-                                  \item Training Accuracy for ccp\_alpha = 0.01 is 53.4432
-                                  \item Training Accuracy for ccp\_alpha = 0.1 is 50.3386
-                                  \item Training Accuracy for ccp\_alpha = 0.2 is 50.3386
+                                  \item Training Accuracy for ccp\_alpha = 0.001 is 68.94
+                                  \item Training Accuracy for ccp\_alpha = 0.01 is 53.44
+                                  \item Training Accuracy for ccp\_alpha = 0.1 is 50.33
+                                  \item Training Accuracy for ccp\_alpha = 0.2 is 50.33
                               \end{itemize}
                         \item Test Set Accuracies:
                               \begin{itemize}
-                                  \item Test Accuracy for ccp\_alpha = 0.001 is 66.2875
-                                  \item Test Accuracy for ccp\_alpha = 0.01 is 51.8097
-                                  \item Test Accuracy for ccp\_alpha = 0.1 is 49.6381
-                                  \item Test Accuracy for ccp\_alpha = 0.2 is 49.6381
+                                  \item Test Accuracy for ccp\_alpha = 0.001 is 66.29
+                                  \item Test Accuracy for ccp\_alpha = 0.01 is 51.81
+                                  \item Test Accuracy for ccp\_alpha = 0.1 is 49.64
+                                  \item Test Accuracy for ccp\_alpha = 0.2 is 49.64
+                              \end{itemize}
+                        \item Validation Set Accuracies:
+                              \begin{itemize}
+                                  \item Validation Accuracy for max\_depth = 15 is 63.22
+                                  \item Validation Accuracy for max\_depth = 25 is 50.00
+                                  \item Validation Accuracy for max\_depth = 35 is 47.36
+                                  \item Validation Accuracy for max\_depth = 45 is 47.36
                               \end{itemize}
                     \end{itemize}
                     \newpage
                     The obtained graph is as follows:
                     \begin{center}
                         \begin{tabular}{c}
-                            \includegraphics[width=0.9\textwidth]{./images/q1_d_ccp_alpha.png}
+                            \includegraphics[width=0.9\textwidth]{./images/q1_part_d_pruning.png}
                         \end{tabular}
                     \end{center}
                     We find that the best ccp\_alpha obtained using the validation set is 0.001
