@@ -5,6 +5,8 @@ import os
 import copy
 import time
 
+import matplotlib.pyplot as plt
+
 label_encoder = None
 
 
@@ -102,6 +104,8 @@ class DTNode:
 
         # if Node column is continuous, median for splitting:
         self.median = median
+
+        self.descendants = 0
 
     def infer_child(self, X):
         """
@@ -233,6 +237,7 @@ class DTTree:
                 depth + 1,
             )
             node.add_child(child)
+            node.descendants += 1 + child.descendants
         # print()
         return node
 
@@ -295,19 +300,60 @@ class DTTree:
             y[i] = 1 if p > 0.5 else 0
         return y
 
-    def post_prune(self, X_val, y_val):
-        # TODO
-        pass
+    def prune_recur(self, node, data, base_acc, plt_data):
+        if node.is_leaf:
+            return
+        else:
+            for child in node.children:
+                self.prune_recur(child, data, base_acc, plt_data)
+            node.is_leaf = True
+
+            X_train, y_train, X_test, y_test, X_val, y_val, features_info = data
+            train_acc = np.sum(self(X_train) == y_train) / len(y_train) * 100
+            test_acc = np.sum(self(X_test) == y_test) / len(y_test) * 100
+            val_acc = np.sum(self(X_val) == y_val) / len(y_val) * 100
+
+            if val_acc > base_acc[0]:
+                # print(f"Pruned at depth {node.depth}, new accuracy: {val_acc:.4f}")
+                base_acc[0] = val_acc
+                node.children = None
+                self.root.descendants -= node.descendants + 1
+
+                plt_data["desc"].append(self.root.descendants)
+                plt_data["val_acc"].append(val_acc)
+                plt_data["test_acc"].append(test_acc)
+                plt_data["train_acc"].append(train_acc)
+            else:
+                # print(
+                #     f"not pruned, depth {node.depth}, {base_acc[0]:.2f}, {val_acc:.4f}"
+                # )
+                node.is_leaf = False
+
+    def post_prune(self, data):
+        plt_data = dict()
+        plt_data["desc"] = []
+        plt_data["val_acc"] = []
+        plt_data["test_acc"] = []
+        plt_data["train_acc"] = []
+        val_acc = np.sum(self(data[-3]) == data[-2]) / len(data[-2]) * 100
+        self.prune_recur(self.root, data, [val_acc], plt_data)
+        return plt_data
 
 
-def _part_a_b_c(one_hot=False, prune=False, depths=[5, 10, 15, 20, 25]):
-    # change the path if you want
+def get_data(one_hot=False):
     global label_encoder
     label_encoder = None
     X_train, y_train, features_info = get_np_array(
         abs_path("data/q1/train.csv"), one_hot
     )
     X_test, y_test, _ = get_np_array(abs_path("data/q1/test.csv"), one_hot)
+    X_val, y_val, _ = get_np_array(abs_path("data/q1/val.csv"), one_hot)
+    return X_train, y_train, X_test, y_test, X_val, y_val, features_info
+
+
+def _part_a_b(one_hot=False, prune=False, depths=[5, 10, 15, 20, 25]):
+    # change the path if you want
+    X_train, y_train, X_test, y_test, X_val, y_val, features_info = get_data(one_hot)
     tree = DTTree()
     train_accs = []
     test_accs = []
@@ -318,7 +364,7 @@ def _part_a_b_c(one_hot=False, prune=False, depths=[5, 10, 15, 20, 25]):
         train_acc = np.sum(tree(X_train) == y_train) / len(y_train) * 100
         test_acc = np.sum(tree(X_test) == y_test) / len(y_test) * 100
         print(
-            f"Depth: {depth}, Train Acc: {train_acc:.2f}%, Test Acc: {test_acc:.2f}%, Time: {t2:.2f}s"
+            f"Time: {t2:.2f}s, Depth: {depth}, Train Acc: {train_acc:.2f}%, Test Acc: {test_acc:.2f}%",
         )
         train_accs.append(train_acc)
         test_accs.append(test_acc)
@@ -330,7 +376,7 @@ def part_a():
 
     print("\nPart A:")
     depths = [5, 10, 15, 20, 25]
-    train_accs, test_accs = _part_a_b_c(one_hot=False, prune=False, depths=depths)
+    train_accs, test_accs = _part_a_b(one_hot=False, prune=False, depths=depths)
     plt.plot(depths, train_accs, label="Train Acc", color="red", marker="o")
     plt.plot(depths, test_accs, label="Test Acc", color="blue", marker="o")
     plt.legend(loc="best")
@@ -338,6 +384,7 @@ def part_a():
     plt.ylabel("Accuracies")
     plt.title("Part A")
     plt.show()
+    plt.clf()
 
 
 def part_b():
@@ -346,10 +393,10 @@ def part_b():
     print("\nPart B:")
     depths = [15, 25, 35, 45]
     print("Using one-hot encoding:")
-    b_train_accs, b_test_accs = _part_a_b_c(one_hot=True, prune=False, depths=depths)
+    train_accs, test_accs = _part_a_b(one_hot=True, prune=False, depths=depths)
     # fig, plt = plt.subplots()
-    plt.plot(depths, b_train_accs, label="Train Acc", color="red", marker="o")
-    plt.plot(depths, b_test_accs, label="Test Acc", color="blue", marker="o")
+    plt.plot(depths, train_accs, label="Train Acc", color="red", marker="o")
+    plt.plot(depths, test_accs, label="Test Acc", color="blue", marker="o")
     plt.legend(loc="best")
     plt.xlabel("Depth")
     plt.ylabel("Accuracies")
@@ -357,7 +404,7 @@ def part_b():
     # plt.set(ylim=[50, 110])
     plt.show()
     print("\nWithout one-hot encoding:")
-    a_train_accs, a_test_accs = _part_a_b_c(one_hot=False, prune=False, depths=depths)
+    a_train_accs, a_test_accs = _part_a_b(one_hot=False, prune=False, depths=depths)
     plt.plot(depths, a_train_accs, label="Train Acc", color="red", marker="o")
     plt.plot(depths, a_test_accs, label="Test Acc", color="blue", marker="o")
     plt.legend(loc="best")
@@ -366,7 +413,48 @@ def part_b():
     plt.title("Without one-hot encoding")
     # plt.set(ylim=[50, 110])
     plt.show()
+    plt.clf()
+
+
+def part_c():
+    print("\nPart C:")
+    depths = [15, 25, 35, 45]
+    print("Pruning, with one-hot encoding:")
+    X_train, y_train, X_test, y_test, X_val, y_val, features_info = get_data(True)
+    for depth in depths:
+        tree = DTTree()
+        t = time.time()
+        tree.fit(X_train, y_train, features_info, max_depth=depth)
+        plt_data = tree.post_prune(
+            (X_train, y_train, X_test, y_test, X_val, y_val, features_info)
+        )
+
+        t2 = time.time() - t
+        train_acc = np.sum(tree(X_train) == y_train) / len(y_train) * 100
+        test_acc = np.sum(tree(X_test) == y_test) / len(y_test) * 100
+        val_acc = np.sum(tree(X_val) == y_val) / len(y_val) * 100
+        print(
+            f"Time: {t2:.2f}s, Depth: {depth}, Train Acc: {train_acc:.2f}%, Test Acc: {test_acc:.2f}%, Val Acc: {val_acc:.2f}%",
+        )
+        desc, train_accs, test_accs, val_accs = (
+            plt_data["desc"],
+            plt_data["train_acc"],
+            plt_data["test_acc"],
+            plt_data["val_acc"],
+        )
+
+        plt.plot(desc, train_accs, label="Train Acc", color="red")
+        plt.plot(desc, test_accs, label="Test Acc", color="blue")
+        plt.plot(desc, val_accs, label="Validation Acc", color="orange")
+        plt.legend(loc="best")
+        plt.xlabel("Number of existing nodes")
+        plt.ylabel("Accuracies")
+        plt.title(f"Part C, Depth: {depth}")
+        plt.axis([max(desc), min(desc), 0, 100])
+        plt.savefig(abs_path(f"./report/images/q1_part_c_depth{depth}.png"))
+        # plt.show()
+        plt.clf()
 
 
 if __name__ == "__main__":
-    part_b()
+    part_c()
