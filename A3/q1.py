@@ -525,5 +525,32 @@ def part_d():
     plt.clf()
 
 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+
+
+def part_e():
+    X_train, y_train, X_test, y_test, X_val, y_val, features_info = get_data(True)
+    y_train = y_train.flatten()
+    tree = RandomForestClassifier(criterion="entropy", oob_score=True)
+    tree.fit(X_train, y_train)
+    print("oob: ", tree.oob_score_)
+    print("train data: ", tree.score(X_train, y_train) * 100)
+    print("test data: ", tree.score(X_test, y_test) * 100)
+    print("val data: ", tree.score(X_val, y_val) * 100)
+
+    param_grid = {
+        "n_estimators": [50, 150, 250, 350],
+        "max_features": [0.1, 0.3, 0.5, 0.7, 0.9],
+        "min_samples_split": [2, 4, 6, 8, 10],
+    }
+    grid = GridSearchCV(estimator=tree, param_grid=param_grid, cv=5, verbose=4)
+    grid.fit(X_train, y_train)
+    print("train score:", grid.score(X_train, y_train) * 100)
+    print("test score:", grid.score(X_test, y_test) * 100)
+    print("val score:", grid.score(X_val, y_val) * 100)
+    print(grid.best_estimator_)
+
+
 if __name__ == "__main__":
-    part_d()
+    part_b()

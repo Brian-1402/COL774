@@ -48,9 +48,9 @@ def get_np_array(file_name):
     return X.to_numpy(), y.to_numpy().flatten()
 
 
-x_train, y_train = get_np_array("train.csv")
-x_test, y_test = get_np_array("test.csv")
-x_val, y_val = get_np_array("val.csv")
+x_train, y_train = get_np_array("A3/data/q1/train.csv")
+x_test, y_test = get_np_array("A3/data/q1/test.csv")
+x_val, y_val = get_np_array("A3/data/q1/val.csv")
 
 
 clf = RandomForestClassifier(
